@@ -1,0 +1,21 @@
+{
+  "name": "immigrant",
+  "version": "0.0.1",
+  "description": "Framework agnostic database migrations",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "database",
+    "db",
+    "migration"
+  ],
+  "author": "Michael Tuttle <tuttlem@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "colors": "^1.1.2",
+    "commander": "^2.12.2",
+    "inquirer": "^4.0.1"
+  }
+}
