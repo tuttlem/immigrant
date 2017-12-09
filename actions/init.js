@@ -2,6 +2,7 @@
 const fs = require('fs');
 const {promisify} = require('util');
 const log = require('../log');
+const {checkDirectoryEmpty} = require('./validate');
 
 const readdirAsync = promisify(fs.readdir),
   mkdirAsync = promisify(fs.mkdir),
@@ -17,11 +18,10 @@ module.exports = () => {
 
   let folder = process.cwd();
 
-  // don't initialize a folder that isn't empty!
-  readdirAsync(folder)
-    .then(fs => {
+  checkDirectoryEmpty(folder)
+    .then(ok => {
 
-      if  (fs.length > 0) {
+      if (!ok) {
         throw new Error('Can\'t initialize a project in an unempty folder');
       }
 
