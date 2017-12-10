@@ -6,9 +6,10 @@ const {checkDirectoryEmpty} = require('./validate');
 
 const readdirAsync = promisify(fs.readdir),
   mkdirAsync = promisify(fs.mkdir),
-  writeFileAsync = promisify(fs.writeFile);
+  writeFileAsync = promisify(fs.writeFile),
+  existsAsync = promisify(fs.exists);
 
-module.exports = () => {
+module.exports = (name) => {
 
   let sampleConfig = {
     "dev": null,
@@ -16,27 +17,30 @@ module.exports = () => {
     "production": null
   };
 
-  let folder = process.cwd();
-
-  checkDirectoryEmpty(folder)
+  existsAsync(`./${name}`)
     .then(ok => {
 
-      if (!ok) {
-        throw new Error('Can\'t initialize a project in an unempty folder');
+      if (ok) {
+        throw new Error('Directory already exists');
       }
 
-      let jobs = [
-        mkdirAsync('./up'),
-        mkdirAsync('./down'),
-        writeFileAsync('./config.json', JSON.stringify(sampleConfig))
-      ];
-
-      Promise.all(jobs)
+      return mkdirAsync(`./${name}`)
         .then(() => {
 
-          log.info('Successfully initialized project');
+          let jobs = [
+            mkdirAsync(`./${name}/up`),
+            mkdirAsync(`./${name}/down`),
+            writeFileAsync(`./${name}/config.json`, JSON.stringify(sampleConfig))
+          ];
 
+          Promise.all(jobs)
+            .then(() => {
+
+              log.info('Successfully initialized project');
+
+            });
         });
+
     })
     .catch(err => {
       log.error(err.message);

@@ -11,7 +11,7 @@ program
   .description(packageJson.description);
 
 program
-  .command('init')
+  .command('init <name>')
   .alias('i')
   .description('Initialize a new immigrant project')
   .action(actions.init);
