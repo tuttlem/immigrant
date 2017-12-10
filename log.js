@@ -1,24 +1,34 @@
 
 class Logger {
 
+  format(msg) {
+
+    if (typeof msg == 'object') {
+      return JSON.stringify(msg);
+    }
+
+    return msg;
+
+  }
+
   success(msg) {
-    console.log(`✓ ${msg}`.green);
+    console.log(`✓ ${this.format(msg)}`.green);
   }
 
   error(msg) {
-    console.log(`✖ ${msg}`.red);
+    console.log(`✖ ${this.format(msg)}`.red);
   }
 
   warn(msg) {
-    console.log(`! ${msg}`.yellow);
+    console.log(`! ${this.format(msg)}`.yellow);
   }
 
   mute(msg) {
-    console.log(`• ${msg}`.grey);
+    console.log(`• ${this.format(msg)}`.white);
   }
 
   info(msg) {
-    console.log(`☆ ${msg}`.cyan);
+    console.log(`☆ ${this.format(msg)}`.cyan);
   }
 
 }

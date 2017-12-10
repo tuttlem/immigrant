@@ -60,6 +60,7 @@ These files are now ready for editing, to place your migration code in.
 
 ### baseline 
 
-*Currently unimplemented*
+There is no *baseline* function inside of the *immigrant* application. Creating a baseline  (when you have an already existing database) is simply a matter of getting that database to generate a *CREATE* script for all of the tables that you want to bootstrap the database with, then applying any seed data (reference table data) that will be useful to a running database. 
+The script that you create can be the *first* migration in your project, and called *baseline*. This is purely for preference though. *immigrant* won't care if the database already has tables or not; it's your personal choice to make your migration project portable or not.
 
 

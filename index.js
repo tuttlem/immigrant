@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 
 const program = require('commander'),
       colors = require('colors'),
@@ -23,12 +24,6 @@ program
   .action(actions.create);
 
 program
-  .command('baseline <env>')
-  .alias('b')
-  .description('Takes a baseline snapshot of a database')
-  .action(actions.baseline);
-
-program
   .command('query <env>')
   .alias('q')
   .description('Query the current version of a database')
@@ -45,6 +40,5 @@ program
   .alias('r')
   .description('Roll a database back to a specific version')
   .action(actions.rollback);
-
 
 program.parse(process.argv);
