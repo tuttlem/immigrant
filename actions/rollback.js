@@ -15,50 +15,38 @@ const readdirAsync = promisify(fs.readdir),
   mkdirAsync = promisify(fs.mkdir),
   writeFileAsync = promisify(fs.writeFile);
 
-module.exports = (env, ver) => {
+
+module.exports = async (env, ver) => {
 
   let folder = process.cwd();
 
-  checkIsProjectDirectory(folder)
-    .then(ok => {
+  try {
 
-      if (!ok) {
-        throw new Error('Current folder doesn\'t look like an immigrant project folder');
-      }
-      
-      return dbForEnvironment(env)
-        .then(db => {
+    let directoryOk = await checkIsProjectDirectory(folder);
 
-          return getCurrentVersion(db)
-            .then(dbVer => {
+    if (!directoryOk) {
+      throw new Error('Current folder doesn\'t look like an immigrant project folder');
+    }
 
-              if (dbVer == null) {
-                throw new Error('There is no migrated version to rollback');
-              }
+    let db          = await dbForEnvironment(env);
+    let dbVer       = await getCurrentVersion(db);
+    let vs          = await getVersions(folder, dbVer, ver);
 
-              return getVersions(folder, dbVer, ver)
-                .then(vs => {
+    // check that we're going in the right direction
+    if (vs.direction > 0) {
+      throw new Error('The migration specified for "to" occurs after the migration specified for "for"');
+    }
 
-                  // check that we're going in the right direction
-                  if (vs.direction > 0) {
-                    throw new Error('The migration specified for "to" occurs after the migration specified for "for"');
-                  }
+    if (vs.versions.length == 0) {
+      log.warn('No work required');
+      return ;
+    }
 
-                  if (vs.versions.length == 0) {
-                    log.warn('No work required');
-                  }
-
-                  console.log(vs);
-
-                  // TODO: run migrations
-                  
-                });
-
-            });
-
-        });
-      
-    }).catch(err => log.error(err.message));
+    // TODO: run migrations
+    
+  } catch (e) {
+    log.error(e.message);
+  }
 
 };
 

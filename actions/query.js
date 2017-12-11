@@ -10,35 +10,29 @@ const {
   getCurrentVersion
 } = require('../common');
 
-module.exports = (env) => {
+module.exports = async (env) => {
 
   let folder = process.cwd();
 
-  return checkIsProjectDirectory(folder)
-    .then(ok => {
+  try {
 
-      if (!ok) {
-        throw new Error('Current folder doesn\'t look like an immigrant project folder');
-      }
+    let ok = await checkIsProjectDirectory(folder);
 
-      return dbForEnvironment(env)
-        .then(db => {
+    if (!ok) {
+      throw new Error('Current folder doesn\'t look like an immigrant project folder');
+    }
 
-          return getCurrentVersion(db)
-            .then(ver => {
+    let db = await dbForEnvironment(env);
+    let ver = await getCurrentVersion(db);
 
-              if (!ver) {
-                log.warn('No versions have been migrated yet');
-              } else {
-                log.info(ver.name);
-              }
+    if (!ver) {
+      log.warn('No versions have been migrated yet');
+    } else {
+      log.info(ver.name);
+    }
 
-            });
+  } catch (err) {
+    log.error(err.message);
+  }
 
-        });
-      
-    })
-    .catch(err => {
-      log.error(err.message);
-    });
 };

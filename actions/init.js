@@ -9,7 +9,7 @@ const readdirAsync = promisify(fs.readdir),
   writeFileAsync = promisify(fs.writeFile),
   existsAsync = promisify(fs.exists);
 
-module.exports = (name) => {
+module.exports = async (name) => {
 
   let sampleConfig = {
     "dev": null,
@@ -17,34 +17,27 @@ module.exports = (name) => {
     "production": null
   };
 
-  existsAsync(`./${name}`)
-    .then(ok => {
+  try {
 
-      if (ok) {
-        throw new Error('Directory already exists');
-      }
+    let hasFolder = await existsAsync(`./${name}`);
 
-      return mkdirAsync(`./${name}`)
-        .then(() => {
+    if (hasFolder) {
+      throw new Error('Directory already exists');
+    }
 
-          let jobs = [
-            mkdirAsync(`./${name}/up`),
-            mkdirAsync(`./${name}/down`),
-            writeFileAsync(`./${name}/config.json`, JSON.stringify(sampleConfig))
-          ];
+    await mkdirAsync(`./${name}`);
 
-          Promise.all(jobs)
-            .then(() => {
+    await Promise.all([
+      mkdirAsync(`./${name}/up`),
+      mkdirAsync(`./${name}/down`),
+      writeFileAsync(`./${name}/config.json`, JSON.stringify(sampleConfig))
+    ]);
 
-              log.info('Successfully initialized project');
+    log.info('Successfully initialized project');
 
-            });
-        });
-
-    })
-    .catch(err => {
-      log.error(err.message);
-    });
+  } catch (err) {
+    log.error(err.message);
+  }
 
 };
 
