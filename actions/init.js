@@ -12,9 +12,9 @@ const readdirAsync = promisify(fs.readdir),
 module.exports = async (name) => {
 
   let sampleConfig = {
-    "dev": null,
-    "test": null,
-    "production": null
+      "dev": "sqlite://./dev.sqlite",
+      "test": "sqlite://./test.sqlite",
+      "production": "sqlite://./production.sqlite"
   };
 
   try {
