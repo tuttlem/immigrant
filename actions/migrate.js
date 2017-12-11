@@ -8,7 +8,8 @@ const {checkIsProjectDirectory} = require('./validate');
 const {
   dbForEnvironment,
   getCurrentVersion,
-  getVersions
+  getVersions,
+  runScripts
 } = require('../common');
 
 const readdirAsync = promisify(fs.readdir),
@@ -41,7 +42,7 @@ module.exports = async (env, ver) => {
       return ;
     }
 
-    // TODO: run migrations
+    await runScripts(db, folder, 'migrate', vs.versions);
     
   } catch (e) {
     log.error(e.message);

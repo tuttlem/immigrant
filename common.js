@@ -6,9 +6,12 @@ const _ = require('lodash');
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
 
+const log = require('./log');
+
 const readdirAsync = promisify(fs.readdir),
   mkdirAsync = promisify(fs.mkdir),
-  writeFileAsync = promisify(fs.writeFile);
+  writeFileAsync = promisify(fs.writeFile),
+  readFileAsync = promisify(fs.readFile);
 
 function dbForEnvironment(env) {
   
@@ -135,9 +138,41 @@ function getVersions(folder, from, to) {
 
 }
 
-function runScripts(db, folder, scripts) {
+async function runScripts(db, folder, mode, scripts) {
 
-  
+  const {MigrationHistory} = require('./models')(db);
+
+  let action = mode == 'migrate' ? 'Migrating' : 'Rolling back';
+  let subFolder = mode == 'migrate' ? 'up' : 'down';
+
+  return await db.transaction(async t => {
+
+    _.forEach(scripts, async script => {
+
+      log.info(`${action} ${script}`);
+
+      let scriptText = await readFileAsync(`${folder}/${subFolder}/${script}.sql`);
+
+      try {
+        scriptText = scriptText.toString();
+        await db.query(scriptText, { raw: true, type: 'SELECT' });
+      } catch (e) {
+        log.error(`${action} ${script} failed: ${e.message}`);
+        throw e;
+      }
+
+      let history = MigrationHistory.build({
+        name: script,
+        direction: mode,
+        executed: new Date()
+      });
+
+      await history.save();
+
+      log.success(`${action} of ${script} successful`);
+    });
+
+  });
 
 }
 
@@ -145,5 +180,6 @@ module.exports = {
   dbForEnvironment,
   getCurrentVersion,
   getScripts,
-  getVersions
+  getVersions,
+  runScripts
 };
