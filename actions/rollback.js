@@ -42,7 +42,7 @@ module.exports = async (env, ver) => {
       return ;
     }
 
-    // TODO: run migrations
+    await runScripts(db, folder, 'rollback', vs.versions);
     
   } catch (e) {
     log.error(e.message);
