@@ -6,6 +6,16 @@ A database migration tool.
 
 Immigrant aims to provide a simple upgrade/downgrade path to your database projects. Keeping projects in a directory format that can be easily version controlled by git.
 
+## Installation
+
+After pulling the code down to your local machine, create a system available script that can be executed with:
+
+```
+npm install -g
+```
+
+You should now be able to move to any directory and start issuing `immigrant` commands.
+
 ## Actions
 
 ### init
