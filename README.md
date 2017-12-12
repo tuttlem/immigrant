@@ -56,7 +56,7 @@ These files are now ready for editing, to place your migration code in.
 
 The `migrate` message takes in a defined environment as well as a version to migrate to. It will attempt to roll the target database forward to the requested version by executing all of the scripts from `current+1` up to `requested`. In cases where the latest version is requested, the `*` symbol is used for version.
 
-When the same version is requested that is deployed, the `migrate` message will attempt to re-apply the requested version.
+When the same version is requested that is deployed, the `migrate` message will not do anything.
 
 ### rollback
 
