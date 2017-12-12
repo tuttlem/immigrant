@@ -23,12 +23,12 @@ module.exports = async (env) => {
     }
 
     let db = await dbForEnvironment(env);
-    let ver = await getCurrentVersion(db);
+    let ver = await getCurrentVersion(db, folder);
 
     if (!ver) {
       log.warn('No versions have been migrated yet');
     } else {
-      log.info(ver.name);
+      log.info(ver);
     }
 
   } catch (err) {

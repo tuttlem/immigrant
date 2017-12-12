@@ -34,7 +34,7 @@ function dbForEnvironment(env) {
 
 }
 
-function getCurrentVersion(db) {
+function getCurrentVersion(db, folder) {
 
   const {MigrationHistory} = require('./models')(db);
 
@@ -42,16 +42,26 @@ function getCurrentVersion(db) {
     .then(() => {
 
       return MigrationHistory.findAll({
-        where: { direction: { [Op.eq]: 'migrate' } },
         order: [['executed', 'DESC']],
-        limit: 1 
-      }).then(hs => {
+        limit: 1
+      }).then(async hs => {
 
         if (hs.length == 0) {
           return null;
         }
 
-        return hs[0];
+        let localVersions = await getLocalVersions(folder);
+        let lastAction = hs[0];
+
+        if (lastAction.direction == 'migrate') {
+          return lastAction.name;
+        } else if (lastAction.direction == 'rollback') {
+          return localVersions[
+            localVersions.indexOf(lastAction.name) - 1
+          ];
+        }
+
+        return null;
 
       });
 
@@ -59,118 +69,161 @@ function getCurrentVersion(db) {
 
 }
 
-function getScripts(folder) {
+async function getDirection(folder, from, to) {
 
-  return Promise.all([
-    readdirAsync(`${folder}/up`),
-    readdirAsync(`${folder}/down`)
-  ]).then(scripts => {
+  let localVersions = await getLocalVersions(folder);
+  let fromIndex = 0;
+  let toIndex = 0;
 
-    let [ups, downs] = scripts;
+  if (from != null) {
+    fromIndex = localVersions.indexOf(from);
+  }
 
-    ups = _.map(ups, u => path.basename(u, '.sql'));
-    downs = _.map(downs, d => path.basename(d, '.sql'));
+  if (to == '*') {
+    toIndex = localVersions.length - 1;
+  } else {
+    toIndex = localVersions.indexOf(to);
+  }
+
+  return Math.sign(toIndex - fromIndex);
+
+}
+
+async function getLocalVersions(folder) {
+
+  let ups = await readdirAsync(`${folder}/up`);
+  let vers = _.map(ups, u => path.basename(u, '.sql'));
+
+  return [ null ].concat(_.sortBy(vers, v => { return parseInt(v.split('-')[0]); }));
+
+}
+
+async function getVersionRange(folder, from, to) {
+
+  let localVersions = await getLocalVersions(folder);
+  let fromIndex = 0;
+  let toIndex = 0;
+
+//  log.mute(localVersions);
+
+  if (from != null) {
+    fromIndex = localVersions.indexOf(from);
+  }
+
+  if (to == '*') {
+    toIndex = localVersions.length - 1;
+  } else {
+    toIndex = localVersions.indexOf(to);
+  }
+
+  log.mute(`Versions ${from} to ${to}`);
+  log.mute(`Index range ${fromIndex} to ${toIndex}`);
+
+  if (fromIndex < toIndex) {
+    /* migrating forward, so skip the first migration */
     
-    _.sortBy(ups, u => { return parseInt(u.split('-')[0]); });
-    _.sortBy(downs, d => { return parseInt(d.split('-')[0]); });
+    return localVersions.splice(fromIndex + 1, toIndex - fromIndex);
 
-    return [ups, _.reverse(downs)];
+  } else if (fromIndex > toIndex) {
+    /* rolling back, so we reverse the array and avoid rolling back the end */
+    
+    return _.reverse(localVersions.splice(toIndex + 1, fromIndex - toIndex + 1));
 
-  });
-
-}
-
-function getVersions(folder, from, to) {
-
-  return getScripts(folder)
-    .then(scripts => {
-
-      let [ups, downs] = scripts;
-
-      if (ups.length == 0 || downs.length == 0) {
-        
-        return {
-          dir: null,
-          versions: []
-        };
-
-      }
-
-      if (to == '*') {
-        to = ups[ups.length - 1];
-      }
-
-      if (from == null) {
-        from = ups[0];
-      }
-        
-      let fromInt = parseInt(from.split('-')[0]);
-      let toInt = parseInt(to.split('-')[0]);
-
-      if (fromInt < toInt) { /* migrating */
-
-        return {
-          dir: 1,
-          versions: ups.splice(
-                      ups.indexOf(from),
-                      ups.indexOf(to) - ups.indexOf(from)
-                    )
-        };
-
-      } else if (fromInt > toInt) { /* rollingback */
-
-        return {
-          dir: -1,
-          versions: downs.splice(
-                      downs.indexOf(to),
-                      downs.indexOf(from) - downs.indexOf(to)
-                    )
-        };
-
-      } else { /* re-apply? */
-        return {
-          dir: 0,
-          versions: [ from ]
-        };
-      }
-
-    });
+  } else {
+    return [];
+  }
 
 }
 
-async function runScripts(db, folder, mode, scripts) {
 
+async function executeScripts(db, folder, versions, mode) {
+
+//  let versions = await getVersionRange(folder, from, to);
   const {MigrationHistory} = require('./models')(db);
 
-  let action = mode == 'migrate' ? 'Migrating' : 'Rolling back';
   let subFolder = mode == 'migrate' ? 'up' : 'down';
 
   return await db.transaction(async t => {
 
-    _.forEach(scripts, async script => {
+    let doExecute = (versions) => {
 
-      log.info(`${action} ${script}`);
-
-      let scriptText = await readFileAsync(`${folder}/${subFolder}/${script}.sql`);
-
-      try {
-        scriptText = scriptText.toString();
-        await db.query(scriptText, { raw: true, type: 'SELECT' });
-      } catch (e) {
-        log.error(`${action} ${script} failed: ${e.message}`);
-        throw e;
+      if (versions.length == 0) {
+        return Promise.resolve(true);
       }
 
-      let history = MigrationHistory.build({
-        name: script,
-        direction: mode,
-        executed: new Date()
-      });
+      let version = versions[0];
+      if (version != null) {
 
-      await history.save();
+        let scriptFile = `${folder}/${subFolder}/${version}.sql`;
+        return readFileAsync(scriptFile)
+          .then(scriptText => {
 
-      log.success(`${action} of ${script} successful`);
+            log.info(`Executing ${scriptFile}`);
+
+            scriptText = scriptText.toString();
+            
+            return db.query(scriptText, { raw: true, type: 'SELECT' })
+              .then(() => {
+
+                let history = MigrationHistory.build({
+                  name: version,
+                  direction: mode,
+                  executed: new Date()
+                });
+
+                return history.save();
+
+              })
+              .then(() => {
+
+                log.success(`Successfully executed ${scriptFile}`);
+                return doExecute(versions.splice(1));
+
+              });
+
+          });
+
+      } else {
+        return doExecute(versions.splice(1));
+      }
+
+    };
+
+    return doExecute(versions);
+
+    /*
+    _.forEach(versions, async version => {
+
+      if (version != null) {
+
+        let scriptFile = `${folder}/${subFolder}/${version}.sql`;
+        let scriptText = await readFileAsync(scriptFile);
+
+        log.info(`Executing ${scriptFile}`);
+
+        try {
+
+          scriptText = scriptText.toString();
+          await db.query(scriptText, { raw: true, type: 'SELECT' });
+
+          let history = MigrationHistory.build({
+            name: version,
+            direction: mode,
+            executed: new Date()
+          });
+
+          await history.save();
+
+          log.success(`Successfully executed ${scriptFile}`);
+        } catch (e) {
+          log.error(`Failed to execute ${scriptFile}: ${e.message}`);
+          throw e;
+        }
+        
+
+      }
     });
+    */
 
   });
 
@@ -179,7 +232,8 @@ async function runScripts(db, folder, mode, scripts) {
 module.exports = {
   dbForEnvironment,
   getCurrentVersion,
-  getScripts,
-  getVersions,
-  runScripts
+  getDirection,
+  getLocalVersions,
+  getVersionRange,
+  executeScripts
 };

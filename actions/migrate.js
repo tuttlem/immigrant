@@ -8,8 +8,10 @@ const {checkIsProjectDirectory} = require('./validate');
 const {
   dbForEnvironment,
   getCurrentVersion,
-  getVersions,
-  runScripts
+  getDirection,
+  getLocalVersions,
+  getVersionRange,
+  executeScripts
 } = require('../common');
 
 const readdirAsync = promisify(fs.readdir),
@@ -29,20 +31,23 @@ module.exports = async (env, ver) => {
     }
 
     let db          = await dbForEnvironment(env);
-    let dbVer       = await getCurrentVersion(db);
-    let vs          = await getVersions(folder, dbVer, ver);
+    let dbVer       = await getCurrentVersion(db, folder);
+  
+    let from        = dbVer == null ? null : dbVer;
+    let to          = ver;
 
-    // check that we're going in the right direction
-    if (vs.direction < 0) {
-      throw new Error('The migration specified for "to" occurs before the migration specified for "for"');
+    if (getDirection(folder, from, to) < 0) {
+      throw new Error('The database is passed the requested version');
     }
+    
+    let vs          = await getVersionRange(folder, from, to);
 
-    if (vs.versions.length == 0) {
+    if (vs.length == 0) {
       log.warn('No work required');
       return ;
     }
 
-    await runScripts(db, folder, 'migrate', vs.versions);
+    await executeScripts(db, folder, vs, 'migrate');
     
   } catch (e) {
     log.error(e.message);
